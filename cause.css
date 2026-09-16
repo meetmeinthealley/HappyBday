@@ -9,12 +9,14 @@
 
 body {
     min-height: 100vh;
-    background: linear-gradient(-45deg, #ffe6e6, #e6e6ff, #ffebf5);
-    background-size: 400% 400%;
-    animation: gradientBG 15s ease infinite;
+    /* background is provided by animated gradient layers (JS) */
+    background: transparent;
     font-family: 'Quicksand', sans-serif;
-    overflow-x: hidden;
-    padding: 2rem;
+    overflow-y: auto; /* allow scrolling when many cards */
+    display: flex;
+    align-items: flex-start; /* stack content from top so new cards push page down */
+    justify-content: center;
+    padding: 3.5rem 0 2rem; /* top padding to avoid overlapping fixed back button */
 }
 
 .custom-cursor {
@@ -39,6 +41,12 @@ body {
     text-align: center;
     position: relative;
     z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2rem;
 }
 
 h1 {
@@ -50,16 +58,55 @@ h1 {
     animation: bounce 1s ease infinite;
 }
 
+.subtitle {
+    color: #9b59ff; /* vivid violet for visibility */
+    font-size: 1.15rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    text-shadow: 0 4px 14px rgba(155,89,255,0.18), 0 1px 0 rgba(0,0,0,0.6);
+}
+
+#reasons-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem; /* vertical spacing between cards */
+    width: 100%;
+    max-width: 900px;
+    justify-items: center; /* center cards horizontally */
+    align-items: start;
+    padding: 0;
+}
+
+/* Ensure cards have a consistent fixed max width and centered */
 .reason-card {
-    background: rgba(255, 255, 255, 0.9);
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Ensure images inside cards don't overflow and cards stay consistent */
+.reason-card img,
+.gif-overlay img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.reason-card {
+    background: rgba(255, 255, 255, 0.95);
     border-radius: 20px;
     padding: 2rem;
-    margin: 1.5rem;
+    margin: 0; /* spacing handled by container gap */
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
     transition: transform 0.3s, box-shadow 0.3s;
     cursor: pointer;
     position: relative;
     overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 140px; /* ensure cards don't collapse and allow consistent spacing */
 }
 
 .reason-card:hover {
@@ -156,8 +203,108 @@ h1 {
 
 @media (max-width: 768px) {
     h1 { font-size: 2rem; }
-    .reason-card { margin: 1rem; }
+    .reason-card { margin: 0; }
     .reason-text { font-size: 1rem; }
+}
+
+/* Polaroid collage styles */
+.polaroid-collage {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    height: 420px; /* compacted */
+    margin: 1rem auto 0;
+    background: linear-gradient(180deg, rgba(250,250,250,0.9), rgba(245,245,245,0.95));
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    overflow: visible;
+    padding: 0.6rem;
+    touch-action: none;
+}
+.polaroid-collage .polaroid {
+    position: absolute;
+    width: 180px; /* slightly smaller */
+    background: #fbfbfb; /* reduce stark white */
+    padding: 6px 6px 26px; /* less footer whitespace */
+    box-shadow: 0 8px 20px rgba(0,0,0,0.14);
+    border-radius: 6px;
+    transition: transform 0.25s ease, box-shadow 0.2s ease;
+    cursor: grab;
+    user-select: none;
+}
+.polaroid-collage .polaroid:active { cursor: grabbing; }
+.polaroid img {
+    display: block;
+    width: 100%;
+    height: 180px; /* taller image area to show faces */
+    object-fit: cover;
+    object-position: center 30%; /* favor faces */
+    border-radius: 4px;
+}
+.polaroid .caption {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    font-size: 0.75rem;
+    color: #333;
+    text-align: center;
+    font-weight: 600;
+}
+
+/* responsive */
+@media (max-width: 600px) {
+    .polaroid-collage { height: 380px; }
+    .polaroid-collage .polaroid { width: 130px; padding-bottom: 22px; }
+    .polaroid img { height: 120px; object-position: center 30%; }
+}
+
+/* Page transition overlay */
+.page-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(255,105,180,0.95), rgba(155,109,255,0.95));
+    z-index: 99999;
+    pointer-events: auto; /* block interactions while animating */
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+    transform: translate3d(0,0,0);
+}
+
+/* Reveal overlay used for circular transitions (clip-path) */
+.reveal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99998;
+    pointer-events: none;
+    will-change: clip-path, transform, opacity;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+}
+.reveal-overlay.hide-after {
+    pointer-events: auto;
+}
+
+/* GPU-accelerated circular reveal element (scales via transform) */
+.reveal-circle {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    transform-origin: center center;
+    z-index: 99998;
+    pointer-events: none;
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.12);
+    background-size: cover;
 }
 .shuffle-button {
     background: linear-gradient(45deg, #ff69b4, #ff99cc);
@@ -191,4 +338,27 @@ h1 {
     color: #ff69b4;
     margin-top: 1rem;
     opacity: 0.7;
+}
+
+/* Back button should match shuffle button styling and sit at top-left */
+.back-button {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    background: linear-gradient(45deg, #ff69b4, #ff99cc);
+    border: none;
+    border-radius: 50px;
+    padding: 0.9rem 1.2rem;
+    font-size: 1.05rem;
+    color: white;
+    margin: 0;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'Comic Neue', cursive;
+    box-shadow: 0 5px 15px rgba(255, 105, 180, 0.3);
+    z-index: 10000;
+}
+
+.back-button:hover {
+    transform: scale(1.08);
 }

@@ -1,6 +1,6 @@
 # 🎂 Happy Birthday Mini Website 🎉  
 
-A beautiful, interactive mini website I built to celebrate my girlfriend’s special day ❤️.  
+A beautiful, interactive mini website I built to celebrate a special day ❤️.  
 This project is made with **HTML, CSS, and JavaScript** and includes animations, surprises, and heartfelt wishes.  
 
 ✨ Anyone can use this project to create a unique online birthday greeting for their loved one!  
@@ -8,7 +8,7 @@ This project is made with **HTML, CSS, and JavaScript** and includes animations,
 ---
 
 ## 🚀 Live Demo  
-👉 [Click here to view the site](https://nikitayadav19.github.io/HappyBirthdayGF)  
+
 
 ---
 
@@ -29,5 +29,4 @@ This project is made with **HTML, CSS, and JavaScript** and includes animations,
 
 ## 🎉 How to Use  
 1. Clone the repo:  
-   ```bash
-   git clone https://github.com/nikitayadav19/HappyBirthdayGF.git
+ 

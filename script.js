@@ -40,8 +40,61 @@ function createFloating() {
     });
 }
 
+// Background cycling layers: create soft crossfading gradients
+function setupBackgroundCycle() {
+    if (document.querySelector('.bg-layers')) return; // already exists
+    const gradients = [
+        'linear-gradient(-45deg, #FFE6E6, #FFF1E6)', // Pastel sunrise
+        'linear-gradient(-45deg, #E9D5FF, #DDEBFF)', // Lavender dream
+        'linear-gradient(-45deg, #FFB6C1, #CFF7E1)', // Blush & teal
+        'linear-gradient(-45deg, #E6FFF4, #D9F7FF)', // Mint candy
+        'linear-gradient(-45deg, #0F1724, #1E293B)', // Midnight (dark)
+        'linear-gradient(-45deg, #FFF4D6, #FFE1A8)'  // Warm gold
+    ];
+
+    const container = document.createElement('div');
+    container.className = 'bg-layers';
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.width = '100%';
+    container.style.height = '100%';
+    container.style.zIndex = '0';
+    container.style.pointerEvents = 'none';
+    document.body.insertBefore(container, document.body.firstChild);
+
+    const layers = gradients.map((g, i) => {
+        const d = document.createElement('div');
+        d.className = 'bg-layer';
+        d.style.position = 'absolute';
+        d.style.inset = '0';
+        d.style.background = g;
+        d.style.opacity = i === 0 ? '1' : '0';
+        d.style.transition = 'opacity 1.6s ease-in-out';
+        d.style.filter = 'saturate(1)';
+        container.appendChild(d);
+        return d;
+    });
+
+    // GSAP timeline to crossfade layers
+    try {
+        const tl = gsap.timeline({ repeat: -1 });
+        const hold = 4.0; // seconds to hold each color
+        layers.forEach((layer, idx) => {
+            tl.to(layer, { opacity: 1, duration: 1.2, ease: 'power2.inOut' })
+              .to(layer, { opacity: 1, duration: hold })
+              .to(layer, { opacity: 0, duration: 1.2, ease: 'power2.inOut' });
+        });
+    } catch (e) {
+        // fallback: simple CSS keyframe fade not implemented; ignore
+        console.warn('Background cycle failed:', e);
+    }
+}
+
 // Initialize animations
 window.addEventListener('load', () => {
+    setupBackgroundCycle();
+
     // Title animation
     gsap.to('h1', {
         opacity: 1,
@@ -83,13 +136,130 @@ window.addEventListener('load', () => {
         });
 
         // Smooth page transition on click
-        button.addEventListener('click', () => {
-            gsap.to('body', {
-                opacity: 0,
-                duration: 1,
-                onComplete: () => {
-                    window.location.href = 'cause.html'; // Replace with the actual URL of the next page
-                }
-            });
+        button.addEventListener('click', (event) => {
+                // pop-out animation for button
+            try {
+                const tl = gsap.timeline();
+                tl.to(button, { scale: 1.18, duration: 0.12, ease: 'power1.out' })
+                  .to(button, { scale: 1, duration: 0.18, ease: 'bounce.out' });
+
+                // small confetti burst at pop start
+                try { if (typeof confetti === 'function') confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } }); } catch (e) {}
+
+                // after pop animation completes, perform circular reveal transition
+                tl.eventCallback('onComplete', () => {
+                    try {
+                        const cx = event.clientX || window.innerWidth/2;
+                        const cy = event.clientY || window.innerHeight/2;
+                        const grad = (document.querySelector('.bg-layer') && document.querySelector('.bg-layer').style.background) || 'linear-gradient(135deg, #FFD8B5 0%, #FF9CC0 50%, #FF3CA6 100%)';
+
+                        // pre-create or reuse a single scaled circle element (transform-based)
+                        let circle = document.querySelector('.reveal-circle');
+                        if (!circle) {
+                            circle = document.createElement('div');
+                            circle.className = 'reveal-circle';
+                            document.body.appendChild(circle);
+                        }
+                        // set gradient and position
+                        circle.style.background = grad;
+                        circle.style.left = cx + 'px';
+                        circle.style.top = cy + 'px';
+
+                        // compute radius to farthest corner and set size
+                        const w = window.innerWidth, h = window.innerHeight;
+                        const dx = Math.max(cx, w - cx);
+                        const dy = Math.max(cy, h - cy);
+                        const maxRadius = Math.hypot(dx, dy);
+                        const size = Math.ceil(maxRadius * 2);
+                        circle.style.width = size + 'px';
+                        circle.style.height = size + 'px';
+
+                        // store values for destination page
+                        sessionStorage.setItem('pageTransition', 'circle');
+                        sessionStorage.setItem('circleX', cx);
+                        sessionStorage.setItem('circleY', cy);
+                        sessionStorage.setItem('circleGrad', grad);
+                        sessionStorage.setItem('circleSize', size);
+
+                        // animate scale via transform (GPU)
+                        gsap.set(circle, { scale: 0, xPercent: -50, yPercent: -50, force3D: true });
+                        gsap.to(circle, { scale: 1, duration: 0.9, ease: 'power3.inOut', force3D: true, onComplete: () => { window.location.href = 'cause.html'; }});
+                    } catch (e) {
+                        try { sessionStorage.setItem('pageTransition', 'to-cause'); } catch (ex) {}
+                        gsap.to('body', {
+                            opacity: 0,
+                            duration: 1,
+                            onComplete: () => { window.location.href = 'cause.html'; }
+                        });
+                    }
+                });
+            } catch (e) {
+                // fallback: direct transition
+                try { if (typeof confetti === 'function') confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } }); } catch (er) {}
+                gsap.to('body', {
+                    opacity: 0,
+                    duration: 1,
+                    onComplete: () => { window.location.href = 'cause.html'; }
+                });
+            }
         });
     });
+
+// Background music: play and persist playback position across pages
+function setupIndexBackgroundMusic() {
+    const indexMusic = document.getElementById('index-music');
+    if (!indexMusic) return;
+
+    // set preferred volume (5%)
+    try { indexMusic.volume = 0.10; } catch (e) { console.warn('Could not set volume:', e); }
+
+    // restore time if available
+    const savedTime = parseFloat(localStorage.getItem('bgSongTime') || '0');
+    if (!isNaN(savedTime) && savedTime > 0) {
+        try { indexMusic.currentTime = Math.min(savedTime, indexMusic.duration || savedTime); } catch (e) { /* ignore */ }
+    }
+
+    // try to set currentTime once metadata is available
+    indexMusic.addEventListener('loadedmetadata', () => {
+        try { indexMusic.currentTime = Math.min(savedTime, indexMusic.duration || savedTime); } catch (e) { /* ignore */ }
+    });
+
+    // attempt play once buffer is sufficient
+    const tryPlay = () => {
+        const p = indexMusic.play();
+        if (p !== undefined) {
+            p.then(() => localStorage.setItem('bgSongPlaying', 'true')).catch((e) => {
+                console.warn('Autoplay prevented on index:', e);
+                localStorage.setItem('bgSongPlaying', 'false');
+            });
+        } else {
+            localStorage.setItem('bgSongPlaying', 'true');
+        }
+    };
+
+    indexMusic.addEventListener('canplaythrough', tryPlay, { once: true });
+    // fallback: try playing after short delay
+    setTimeout(tryPlay, 500);
+
+    // regularly save currentTime and playing state
+    const saver = setInterval(() => {
+        try {
+            localStorage.setItem('bgSongTime', indexMusic.currentTime.toString());
+            localStorage.setItem('bgSongPlaying', (!indexMusic.paused).toString());
+        } catch (e) { /* ignore */ }
+    }, 1000);
+
+    // on unload, save one last time and clear interval
+    window.addEventListener('beforeunload', () => {
+        try {
+            localStorage.setItem('bgSongTime', indexMusic.currentTime.toString());
+            localStorage.setItem('bgSongPlaying', (!indexMusic.paused).toString());
+        } catch (e) { /* ignore */ }
+        clearInterval(saver);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setupIndexBackgroundMusic();
+    setupBackgroundCycle();
+});

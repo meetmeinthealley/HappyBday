@@ -6,6 +6,8 @@
     <title>Why You're My Best Friend! 💖</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <link rel="stylesheet" href="./cause.css">
+    <link rel="preload" as="audio" href="./assets/happy-birthday-song.mp3">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
     <style>
        
     </style>
@@ -18,10 +20,16 @@
     </div>
 
     <div class="container">
-        <h1>Happy Birthday Priyaa 💖</h1>
-        
+        <h1>Happy Birthday Meghu 💖</h1>
+
+        <!-- Polaroid collage moved directly under the H1 -->
+        <div id="collage" class="polaroid-collage" data-images="assets/collage/WhatsApp Image 2026-09-16 at 19.22.48.jpeg, assets/collage/WhatsApp Image 2026-09-16 at 19.23.28.jpeg, assets/collage/WhatsApp Image 2026-09-16 at 19.24.02.jpeg, assets/collage/WhatsApp Image 2026-09-16 at 19.24.25.jpeg, assets/collage/WhatsApp Image 2026-09-16 at 19.25.26.jpeg, assets/collage/WhatsApp Image 2026-09-16 at 19.26.10.jpeg"></div>
+
+        <p class="subtitle">A little list of reasons why you're so special — click the button to shuffle them! 💕</p>
+
         <div id="reasons-container"></div>
         
+        <button class="back-button">Go Back ←</button>
         <button class="shuffle-button">Click Here... 💕</button>
         <div class="reason-counter"></div>
 
@@ -32,6 +40,8 @@
             <div class="ending-text">You're the BESTEST ! 💖</div>
         </div>
     </div>
+
+    <audio id="index-music" src="./assets/happy-birthday-song.mp3" preload="auto" loop style="display:none"></audio>
 
     <script src="cause.js">
        

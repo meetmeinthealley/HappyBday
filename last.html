@@ -202,15 +202,41 @@
 
         .memory-img {
             width: 100%;
-            height: 250px;
+            /* Use aspect-ratio for consistent sizing across viewports */
+            aspect-ratio: 16 / 9;
+            height: auto;
+            max-height: 360px;
             object-fit: cover;
+            object-position: center center;
             border-radius: 15px;
             margin-bottom: 1rem;
-            transition: transform 0.5s ease;
+            transition: transform 0.5s ease, height 0.3s ease;
+        }
+
+        /* Portrait variant for sequence image: taller crop and focus toward face */
+        .memory-img.portrait {
+            aspect-ratio: 3 / 4; /* portrait */
+            max-height: 540px;
+            object-position: center 30%; /* nudge upward to keep face visible */
+            border-radius: 15px;
         }
 
         .memory-card:hover .memory-img {
             transform: scale(1.05);
+        }
+
+        /* Tighter size on small screens */
+        @media (max-width: 480px) {
+            .memory-img {
+                max-height: 220px;
+                aspect-ratio: 4 / 3;
+            }
+
+            .memory-img.portrait {
+                max-height: 320px;
+                aspect-ratio: 3 / 4;
+                object-position: center 25%;
+            }
         }
 
         .memory-date {
@@ -356,10 +382,35 @@
                 font-size: 2.5rem;
             }
         }
+
+        /* Go back button (top-left) */
+        .go-back-btn {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 1200;
+            padding: 0.45rem 0.8rem;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+            backdrop-filter: blur(6px);
+        }
+
+        .go-back-btn:hover { transform: translateY(-2px); }
+
+        @media (max-width: 480px) {
+            .go-back-btn { top: 10px; left: 10px; padding: 0.4rem 0.6rem; }
+        }
     </style>
 </head>
 
 <body>
+    <button class="go-back-btn" aria-label="Go back">← Back</button>
+    <audio id="index-music" src="./assets/happy-birthday-song.mp3" preload="auto" loop style="display:none"></audio>
     <div class="magic-sparkles"></div>
     <div class="floating-hearts">
         <!-- Hearts will be generated via CSS -->
@@ -377,20 +428,19 @@
 
     <div class="memory-container">
         <div class="memory-card">
-            <img src="./d1.jpg" alt="First Date" class="memory-img">
+            <img src="assets/us2.jpeg" alt="First Date" class="memory-img">
             <div class="memory-date">Her Smile Says It All</div>
-            <div class="memory-caption">You’re truly one of the sweetest girls I know, and I feel lucky to have a sis
+            <div class="memory-caption">You’re truly one of the sweetest girls I know, and I feel lucky to have a friend
                 like you.❤️</div>
         </div>
         <div class="memory-card">
-            <img src="./d2.jpg" alt="Beach Day" class="memory-img">
-            <div class="memory-date">Together Vibes</div>
-            <div class="memory-caption">May your journey ahead be filled with happiness, success, and endless
-                smiles.😊💕</div>
+            <img src="assets/rude.jpeg" alt="Rude Day" class="memory-img">
+            <div class="memory-date">Cute Vibes</div>
+            <div class="memory-caption">That mischievous smile — my favorite snapshot of you. It brightens every room and melts my heart every time. 😊💕</div>
         </div>
         <div class="memory-card">
-            <img src="./d3.jpg" alt="Movie Night" class="memory-img">
-            <div class="memory-date">Pretty Soul</div>
+            <img src="assets/seq/1.jpeg" alt="Movie Night" class="memory-img portrait" data-frames="assets/seq/1.jpeg, assets/seq/2.jpeg, assets/seq/3.jpeg, assets/seq/4.jpeg, assets/seq/5.jpeg, assets/seq/6.jpeg, assets/seq/7.jpeg" data-interval="500" data-preload="true">
+            <div class="memory-date">First BirthDay</div>
             <div class="memory-caption">Keep being the amazing person you are—you make every moment brighter.🌸💖</div>
         </div>
 
@@ -404,6 +454,205 @@
         <p>You deserve all the joy in the world—keep shining and spreading your beautiful energy.✨</p>
         <a href="#" class="goodbye-btn">Until We Meet Again 💝</a>
     </section>
+
+    <script>
+        (function(){
+            // Cycle images for any .memory-img that has a data-frames attribute (comma-separated URLs)
+            const cycleImgs = document.querySelectorAll('.memory-img[data-frames]');
+            cycleImgs.forEach(img => {
+                const frames = img.dataset.frames.split(',').map(s => s.trim()).filter(Boolean);
+                if (frames.length <= 1) return; // nothing to animate
+
+                const interval = Math.max(40, parseInt(img.dataset.interval) || 200); // ms, min 40ms
+                const preload = img.dataset.preload !== 'false';
+
+                // Preload frames to avoid flicker
+                if (preload) frames.forEach(src => { const i = new Image(); i.src = src; });
+
+                let current = 0;
+                img.src = frames[0];
+
+                // Avoid creating multiple timers if script runs twice
+                if (img._seqTimer) return;
+
+                // Use setInterval for simplicity; on very slow devices the minimum is clamped above
+                img._seqTimer = setInterval(() => {
+                    current = (current + 1) % frames.length;
+                    img.src = frames[current];
+                }, interval);
+
+                // Clean up when element is removed
+                const obs = new MutationObserver(() => {
+                    if (!document.body.contains(img)) {
+                        clearInterval(img._seqTimer);
+                        obs.disconnect();
+                    }
+                });
+                obs.observe(document.body, { childList: true, subtree: true });
+            });
+        })();
+
+        // Play churail.opus when the goodbye button is clicked
+        (function(){
+            const btn = document.querySelector('.goodbye-btn');
+            if (!btn) return;
+
+            // Try to use an existing audio file; fall back gracefully if not available
+            const sources = [
+                'assets/churail.opus',
+                'assets/churail.mp3'
+            ];
+
+            let audio = null;
+            function initAudio() {
+                for (const src of sources) {
+                    try {
+                        const a = new Audio(src);
+                        a.preload = 'auto';
+                        // Quick test: set src and let browser decide if playable
+                        audio = a;
+                        return;
+                    } catch (e) {
+                        // continue
+                    }
+                }
+            }
+
+            initAudio();
+
+            btn.addEventListener('click', function(e){
+                // allow default anchor behavior to be prevented
+                e.preventDefault();
+                if (!audio) {
+                    initAudio();
+                    if (!audio) {
+                        console.warn('No audio source found for goodbye button.');
+                        return;
+                    }
+                }
+                audio.volume = 0.8;
+                // Some browsers require a user gesture — click is a user gesture so should play
+                audio.currentTime = 0;
+                const p = audio.play();
+                if (p && p.catch) p.catch(err => console.warn('Playback failed:', err));
+
+                // small pulse effect on button to show feedback
+                btn.style.transition = 'transform 0.18s ease';
+                btn.style.transform = 'scale(1.06)';
+                setTimeout(()=> btn.style.transform = '', 180);
+            });
+        })();
+    </script>
+
+    <script>
+        (function(){
+            // Background music shared with other pages (keeps in flow with cause page)
+            const bgSources = ['assets/happy-birthday-song.mp3', 'assets/happy-birthday-song.ogg'];
+            let bgAudio = null;
+
+            function initBgAudio(){
+                if (bgAudio) return;
+
+                // Prefer an existing <audio id="index-music"> element if present
+                const existingEl = document.getElementById('index-music');
+                if (existingEl) {
+                    bgAudio = existingEl;
+                    try { bgAudio.loop = true; bgAudio.preload = 'auto'; bgAudio.volume = 0.10; } catch(e){}
+                    try { window.bgAudio = bgAudio; } catch(e){}
+
+                    const savedTime = parseFloat(localStorage.getItem('bgSongTime') || '0');
+                    const wasPlaying = localStorage.getItem('bgSongPlaying') === 'true';
+                    if (!isNaN(savedTime) && savedTime > 0) {
+                        bgAudio.addEventListener('loadedmetadata', () => {
+                            try { bgAudio.currentTime = Math.min(savedTime, bgAudio.duration || savedTime); } catch(e){}
+                        });
+                    }
+                    bgAudio.addEventListener('canplaythrough', () => {
+                        try { if (wasPlaying) bgAudio.play().catch(()=>{}); } catch(e){}
+                    });
+
+                    // keep localStorage in sync
+                    setInterval(()=>{
+                        try {
+                            localStorage.setItem('bgSongTime', String(bgAudio.currentTime || 0));
+                            localStorage.setItem('bgSongPlaying', String(!bgAudio.paused));
+                        } catch(e){}
+                    }, 1000);
+
+                    return;
+                }
+
+                for (const s of bgSources){
+                    try {
+                        const a = new Audio(s);
+                        a.loop = true;
+                        a.preload = 'auto';
+                        a.volume = 0.10; // match earlier pages (10%)
+                        bgAudio = a;
+                        try { window.bgAudio = bgAudio; } catch(e){}
+                        break;
+                    } catch(e) { continue; }
+                }
+                if (!bgAudio) return;
+
+                // restore playback state/time if present
+                const savedTime = parseFloat(localStorage.getItem('bgSongTime')) || 0;
+                const wasPlaying = localStorage.getItem('bgSongPlaying') === 'true';
+
+                bgAudio.addEventListener('canplaythrough', () => {
+                    try { if (savedTime && bgAudio.duration) bgAudio.currentTime = Math.min(savedTime, bgAudio.duration - 0.05); }
+                    catch(e) {}
+                    if (wasPlaying) {
+                        bgAudio.play().catch(()=>{});
+                    }
+                });
+
+                // keep localStorage in sync
+                setInterval(()=>{
+                    try {
+                        localStorage.setItem('bgSongTime', String(bgAudio.currentTime || 0));
+                        localStorage.setItem('bgSongPlaying', String(!bgAudio.paused));
+                    } catch(e){}
+                }, 1000);
+            }
+
+            initBgAudio();
+
+            // Go-back button stops the song and navigates back to cause page
+            const backBtn = document.querySelector('.go-back-btn');
+            if (backBtn){
+                backBtn.addEventListener('click', (e)=>{
+                    e.preventDefault();
+                    try {
+                        // Save current playback time and mark as playing so destination page can resume
+                        if (bgAudio){
+                            try { localStorage.setItem('bgSongTime', String(bgAudio.currentTime || 0)); } catch(e){}
+                            try { localStorage.setItem('bgSongPlaying', 'true'); } catch(e){}
+                        } else {
+                            // fallback: take first audio element on page
+                            const a = document.querySelector('audio');
+                            if (a) {
+                                try { localStorage.setItem('bgSongTime', String(a.currentTime || 0)); } catch(e){}
+                                try { localStorage.setItem('bgSongPlaying', String(!a.paused)); } catch(e){}
+                            }
+                        }
+                    } catch(err){}
+
+                    // perform a smooth transition back to cause.html while keeping music state
+                    try {
+                        sessionStorage.setItem('pageTransition', 'to-cause');
+                        let overlay = document.querySelector('.page-overlay');
+                        if (!overlay) { overlay = document.createElement('div'); overlay.className = 'page-overlay'; document.body.appendChild(overlay); }
+                        gsap.set(overlay, { xPercent: 100, force3D: true });
+                        gsap.to(overlay, { xPercent: 0, duration: 0.8, ease: 'power3.inOut', force3D: true, onComplete: () => { window.location.href = 'cause.html'; }});
+                    } catch(e) {
+                        // fallback navigation
+                        window.location.href = 'cause.html';
+                    }
+                });
+            }
+        })();
+    </script>
 </body>
 
 </html>
