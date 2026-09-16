@@ -13,23 +13,18 @@
     </style>
 </head>
 <body>
-    <div class="custom-cursor">
-        <svg viewBox="0 0 24 24">
-            <path fill="#ff69b4" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-        </svg>
-    </div>
-
     <div class="container">
         <h1>Happy Birthday Meghu 💖</h1>
 
-        <!-- Polaroid collage moved directly under the H1 -->
-        <div id="collage" class="polaroid-collage" data-images="assets/collage/WhatsApp Image 2026-09-16 at 19.22.48.jpeg, assets/collage/WhatsApp Image 2026-09-16 at 19.23.28.jpeg, assets/collage/WhatsApp Image 2026-09-16 at 19.24.02.jpeg, assets/collage/WhatsApp Image 2026-09-16 at 19.24.25.jpeg, assets/collage/WhatsApp Image 2026-09-16 at 19.25.26.jpeg, assets/collage/WhatsApp Image 2026-09-16 at 19.26.10.jpeg"></div>
+        <div class="memory-photo">
+            <img src="./assets/clg1.jpeg" alt="Birthday memory">
+        </div>
 
         <p class="subtitle">A little list of reasons why you're so special — click the button to shuffle them! 💕</p>
 
         <div id="reasons-container"></div>
         
-        <button class="back-button">Go Back ←</button>
+        <button type="button" class="back-button" aria-label="Go back"><span class="back-arrow" aria-hidden="true">←</span> Go Back</button>
         <button class="shuffle-button">Click Here... 💕</button>
         <div class="reason-counter"></div>
 
@@ -41,7 +36,7 @@
         </div>
     </div>
 
-    <audio id="index-music" src="./assets/happy-birthday-song.mp3" preload="auto" loop style="display:none"></audio>
+    <audio id="index-music" src="./assets/happy-birthday-song.mp3" preload="auto" autoplay loop style="display:none"></audio>
 
     <script src="cause.js">
        

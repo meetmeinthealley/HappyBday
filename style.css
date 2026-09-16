@@ -140,3 +140,27 @@ h1 {
     box-shadow: 0 30px 60px rgba(0,0,0,0.12);
     background-size: cover;
 }
+
+.start-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+}
+
+.start-button {
+    background: linear-gradient(45deg, #ff69b4, #ff99cc);
+    color: white;
+    border: none;
+    border-radius: 999px;
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    box-shadow: 0 12px 30px rgba(255, 105, 180, 0.35);
+    cursor: pointer;
+}

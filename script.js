@@ -210,51 +210,65 @@ function setupIndexBackgroundMusic() {
     const indexMusic = document.getElementById('index-music');
     if (!indexMusic) return;
 
-    // set preferred volume (5%)
+    const persistState = () => {
+        try {
+            localStorage.setItem('bgSongTime', indexMusic.currentTime.toString());
+            localStorage.setItem('bgSongPlaying', (!indexMusic.paused).toString());
+        } catch (e) { /* ignore */ }
+    };
+
+    const startMusic = async () => {
+        try {
+            indexMusic.muted = false;
+            indexMusic.volume = 0.10;
+            await indexMusic.play();
+            localStorage.setItem('bgSongPlaying', 'true');
+            sessionStorage.setItem('musicUnlocked', 'true');
+            const overlay = document.querySelector('.start-screen');
+            if (overlay) overlay.remove();
+        } catch (e) {
+            localStorage.setItem('bgSongPlaying', 'false');
+        }
+    };
+
+    const setupStartOverlay = () => {
+        if (sessionStorage.getItem('musicUnlocked') === 'true') return;
+        if (document.querySelector('.start-screen')) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'start-screen';
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'start-button';
+        button.textContent = 'You Ready?';
+        button.addEventListener('click', () => {
+            sessionStorage.setItem('musicUnlocked', 'true');
+            startMusic();
+        });
+        overlay.appendChild(button);
+        document.body.appendChild(overlay);
+    };
+
     try { indexMusic.volume = 0.10; } catch (e) { console.warn('Could not set volume:', e); }
 
-    // restore time if available
     const savedTime = parseFloat(localStorage.getItem('bgSongTime') || '0');
     if (!isNaN(savedTime) && savedTime > 0) {
         try { indexMusic.currentTime = Math.min(savedTime, indexMusic.duration || savedTime); } catch (e) { /* ignore */ }
     }
 
-    // try to set currentTime once metadata is available
     indexMusic.addEventListener('loadedmetadata', () => {
         try { indexMusic.currentTime = Math.min(savedTime, indexMusic.duration || savedTime); } catch (e) { /* ignore */ }
     });
 
-    // attempt play once buffer is sufficient
-    const tryPlay = () => {
-        const p = indexMusic.play();
-        if (p !== undefined) {
-            p.then(() => localStorage.setItem('bgSongPlaying', 'true')).catch((e) => {
-                console.warn('Autoplay prevented on index:', e);
-                localStorage.setItem('bgSongPlaying', 'false');
-            });
-        } else {
-            localStorage.setItem('bgSongPlaying', 'true');
-        }
-    };
+    if (sessionStorage.getItem('musicUnlocked') === 'true') {
+        indexMusic.addEventListener('canplaythrough', startMusic, { once: true });
+    } else {
+        setupStartOverlay();
+    }
 
-    indexMusic.addEventListener('canplaythrough', tryPlay, { once: true });
-    // fallback: try playing after short delay
-    setTimeout(tryPlay, 500);
-
-    // regularly save currentTime and playing state
-    const saver = setInterval(() => {
-        try {
-            localStorage.setItem('bgSongTime', indexMusic.currentTime.toString());
-            localStorage.setItem('bgSongPlaying', (!indexMusic.paused).toString());
-        } catch (e) { /* ignore */ }
-    }, 1000);
-
-    // on unload, save one last time and clear interval
+    const saver = setInterval(persistState, 1000);
     window.addEventListener('beforeunload', () => {
-        try {
-            localStorage.setItem('bgSongTime', indexMusic.currentTime.toString());
-            localStorage.setItem('bgSongPlaying', (!indexMusic.paused).toString());
-        } catch (e) { /* ignore */ }
+        persistState();
         clearInterval(saver);
     });
 }

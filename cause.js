@@ -146,16 +146,6 @@ function createFloatingElement() {
     });
 }
 
-// Custom cursor (same as before)
-const cursor = document.querySelector('.custom-cursor');
-document.addEventListener('mousemove', (e) => {
-    gsap.to(cursor, {
-        x: e.clientX - 15,
-        y: e.clientY - 15,
-        duration: 0.2
-    });
-});
-
 // Create initial floating elements
 const floatingInterval = setInterval(createFloatingElement, 2000);
 
@@ -210,11 +200,51 @@ function setupBackgroundCycleCause() {
 
 // Background music: recreate (hidden) audio and resume from saved position
 function setupCauseBackgroundMusic() {
-    // don't create if running in same-page embed
+    const persistState = (audio) => {
+        try {
+            localStorage.setItem('bgSongTime', audio.currentTime.toString());
+            localStorage.setItem('bgSongPlaying', (!audio.paused).toString());
+        } catch (e) {}
+    };
+
+    const startMusic = async () => {
+        const audio = document.getElementById('index-music') || document.getElementById('bg-music-dynamic');
+        if (!audio) return;
+
+        try {
+            audio.muted = false;
+            audio.volume = 0.10;
+            await audio.play();
+            localStorage.setItem('bgSongPlaying', 'true');
+            sessionStorage.setItem('musicUnlocked', 'true');
+            const overlay = document.querySelector('.start-screen');
+            if (overlay) overlay.remove();
+        } catch (e) {
+            localStorage.setItem('bgSongPlaying', 'false');
+        }
+    };
+
+    const setupStartOverlay = () => {
+        if (sessionStorage.getItem('musicUnlocked') === 'true') return;
+        if (document.querySelector('.start-screen')) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'start-screen';
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'start-button';
+        button.textContent = 'You Ready?';
+        button.addEventListener('click', () => {
+            sessionStorage.setItem('musicUnlocked', 'true');
+            startMusic();
+        });
+        overlay.appendChild(button);
+        document.body.appendChild(overlay);
+    };
+
     try {
         const existing = document.getElementById('index-music');
         if (existing) {
-            // initialize shared audio element instead of creating a new one
             try {
                 existing.preload = 'auto';
                 existing.loop = true;
@@ -222,25 +252,15 @@ function setupCauseBackgroundMusic() {
             } catch(e) {}
 
             const savedTime = parseFloat(localStorage.getItem('bgSongTime') || '0');
-            const shouldPlay = localStorage.getItem('bgSongPlaying') === 'true';
             if (!isNaN(savedTime) && savedTime > 0) {
                 existing.addEventListener('loadedmetadata', () => {
                     try { existing.currentTime = Math.min(savedTime, existing.duration || savedTime); } catch (e) { /* ignore */ }
                 });
             }
-            existing.addEventListener('canplaythrough', () => {
-                try { if (shouldPlay) existing.play().catch(()=>{}); } catch(e){}
-            });
 
-            // regularly save currentTime and playing state
-            const saver = setInterval(() => {
-                try {
-                    localStorage.setItem('bgSongTime', existing.currentTime.toString());
-                    localStorage.setItem('bgSongPlaying', (!existing.paused).toString());
-                } catch (e) {}
-            }, 1000);
-
-            window.indexMusic = existing; // expose
+            const saver = setInterval(() => persistState(existing), 1000);
+            window.indexMusic = existing;
+            setupStartOverlay();
             return;
         }
     } catch (e) {}
@@ -255,41 +275,22 @@ function setupCauseBackgroundMusic() {
 
     try { audio.volume = 0.10; } catch (e) { console.warn('Could not set cause audio volume:', e); }
 
-    // restore saved time and playing state
     const savedTime = parseFloat(localStorage.getItem('bgSongTime') || '0');
-    const shouldPlay = localStorage.getItem('bgSongPlaying') === 'true';
     if (!isNaN(savedTime) && savedTime > 0) {
-        // try set currentTime after metadata loads
         audio.addEventListener('loadedmetadata', () => {
             try { audio.currentTime = Math.min(savedTime, audio.duration || savedTime); } catch (e) { /* ignore */ }
         });
     }
 
-    const playAttempt = () => {
-        const p = audio.play();
-        if (p !== undefined) {
-            p.catch((e) => {
-                console.warn('Autoplay prevented on cause:', e);
-            });
-        }
-    };
+    if (sessionStorage.getItem('musicUnlocked') === 'true') {
+        audio.addEventListener('canplaythrough', startMusic, { once: true });
+    } else {
+        setupStartOverlay();
+    }
 
-    if (shouldPlay) playAttempt();
-
-    // keep saving position regularly so navigation back/forward stays in sync
-    const saver = setInterval(() => {
-        try {
-            localStorage.setItem('bgSongTime', audio.currentTime.toString());
-            localStorage.setItem('bgSongPlaying', (!audio.paused).toString());
-        } catch (e) {}
-    }, 1000);
-
-    // cleanup on unload
+    const saver = setInterval(() => persistState(audio), 1000);
     window.addEventListener('beforeunload', () => {
-        try {
-            localStorage.setItem('bgSongTime', audio.currentTime.toString());
-            localStorage.setItem('bgSongPlaying', (!audio.paused).toString());
-        } catch (e) {}
+        persistState(audio);
         clearInterval(saver);
     });
 }
@@ -297,109 +298,6 @@ function setupCauseBackgroundMusic() {
 document.addEventListener('DOMContentLoaded', () => {
     setupCauseBackgroundMusic();
     setupBackgroundCycleCause();
-
-// build polaroid collage if present — place items into non-overlapping cells so each is ~80% visible
-try {
-    const collage = document.getElementById('collage');
-    if (collage) {
-        const list = (collage.dataset.images || '').split(',').map(s=>s.trim()).filter(Boolean);
-        const n = list.length;
-        const w = collage.clientWidth;
-        const h = collage.clientHeight;
-        let z = 2;
-
-        // compute grid to place items without heavy overlap
-        const cols = Math.ceil(Math.sqrt(n));
-        const rows = Math.ceil(n / cols);
-        const pad = 20;
-        const cellW = (w - pad*2) / cols;
-        const cellH = (h - pad*2) / rows;
-
-        // desired polaroid size (leave spacing so at least ~80% visible)
-        const baseWidth = Math.min(220, cellW * 0.85);
-        const baseHeight = baseWidth * 0.8 + 38; // include caption/footer area
-
-        let idx = 0;
-        for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-                if (idx >= n) break;
-                const src = list[idx];
-                const el = document.createElement('div');
-                el.className = 'polaroid';
-                el.style.width = baseWidth + 'px';
-
-                // center in cell with slight random offset
-                const cellX = pad + c * cellW;
-                const cellY = pad + r * cellH;
-                const centerX = cellX + cellW/2;
-                const centerY = cellY + cellH/2;
-                const jitterX = (Math.random()*0.34 - 0.17) * cellW; // +/-17% of cell
-                const jitterY = (Math.random()*0.34 - 0.17) * cellH;
-                const left = Math.max(pad, Math.min(w - baseWidth - pad, centerX + jitterX - baseWidth/2));
-                const top = Math.max(pad, Math.min(h - baseHeight - pad, centerY + jitterY - (baseHeight-38)/2));
-
-                const rot = (Math.random() * 24) - 12; // milder rotation
-                const scale = 0.95 + Math.random()*0.08;
-                el.style.left = left + 'px';
-                el.style.top = top + 'px';
-                el.style.transform = `rotate(${rot}deg) scale(${scale})`;
-                el.style.zIndex = String(z + idx);
-
-                const img = document.createElement('img');
-                img.src = src;
-                img.alt = 'photo-'+idx;
-                img.style.opacity = '1';
-                // prefer faces: center slightly higher
-                img.style.objectFit = 'cover';
-                img.style.objectPosition = 'center 30%';
-
-                const cap = document.createElement('div');
-                cap.className = 'caption';
-                cap.textContent = '';
-
-                el.appendChild(img);
-                el.appendChild(cap);
-
-                el.addEventListener('click', () => {
-                    el.style.zIndex = String(++z);
-                    gsap.to(el, { scale: 1.02, duration: 0.12 }).then(()=>gsap.to(el, { scale: scale, duration: 0.18 }));
-                });
-
-                collage.appendChild(el);
-                idx++;
-            }
-        }
-
-        // responsive: recompute on resize
-        window.addEventListener('resize', () => {
-            const w2 = collage.clientWidth;
-            const h2 = collage.clientHeight;
-            const cols2 = Math.ceil(Math.sqrt(n));
-            const rows2 = Math.ceil(n / cols2);
-            const cellW2 = (w2 - pad*2) / cols2;
-            const cellH2 = (h2 - pad*2) / rows2;
-            const baseW2 = Math.min(220, cellW2 * 0.85);
-            const baseH2 = baseW2 * 0.8 + 38;
-            let i2 = 0;
-            collage.querySelectorAll('.polaroid').forEach((el) => {
-                const r2 = Math.floor(i2 / cols2);
-                const c2 = i2 % cols2;
-                const cellX2 = pad + c2 * cellW2;
-                const cellY2 = pad + r2 * cellH2;
-                const centerX2 = cellX2 + cellW2/2;
-                const centerY2 = cellY2 + cellH2/2;
-                const jitterX2 = (Math.random()*0.34 - 0.17) * cellW2;
-                const jitterY2 = (Math.random()*0.34 - 0.17) * cellH2;
-                const left2 = Math.max(pad, Math.min(w2 - baseW2 - pad, centerX2 + jitterX2 - baseW2/2));
-                const top2 = Math.max(pad, Math.min(h2 - baseH2 - pad, centerY2 + jitterY2 - (baseH2-38)/2));
-                el.style.width = baseW2 + 'px';
-                el.style.left = left2 + 'px';
-                el.style.top = top2 + 'px';
-                i2++;
-            });
-        });
-    }
-} catch(e) { console.warn('Collage build failed', e); }
 
 // if we arrived via a transition, reveal by sliding overlay out
 const flag = sessionStorage.getItem('pageTransition');
